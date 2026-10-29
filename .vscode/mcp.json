@@ -1,0 +1,43 @@
+{
+  "servers": {
+    "codegraph": {
+      "type": "stdio",
+      "command": "C:\\Users\\DELL\\AppData\\Local\\Programs\\tokless\\tokless.exe",
+      "args": [
+        "run-mcp",
+        "--agent",
+        "copilot",
+        "cmd",
+        "/c",
+        "C:\\Users\\DELL\\AppData\\Roaming\\npm\\codegraph.CMD",
+        "serve",
+        "--mcp"
+      ]
+    },
+    "context-mode": {
+      "type": "stdio",
+      "command": "C:\\Users\\DELL\\AppData\\Local\\Programs\\tokless\\tokless.exe",
+      "args": [
+        "run-mcp",
+        "--context-mode",
+        "cmd",
+        "/c",
+        "C:\\Users\\DELL\\AppData\\Roaming\\npm\\context-mode.CMD"
+      ],
+      "env": {
+        "CONTEXT_MODE_PLATFORM": "copilot-vscode",
+        "CONTEXT_MODE_COPILOT_PLUGIN": "1"
+      }
+    },
+    "projectmem": {
+      "type": "stdio",
+      "command": "C:\\Users\\DELL\\AppData\\Local\\Programs\\tokless\\tokless.exe",
+      "args": [
+        "run-mcp",
+        "--tool",
+        "projectmem",
+        "C:\\Users\\DELL\\.local\\bin\\pjm-mcp.EXE"
+      ]
+    }
+  }
+}

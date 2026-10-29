@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "C:/Users/DELL/AppData/Local/Programs/tokless/tokless.exe rtk-hook copilot"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": "C:/Users/DELL/AppData/Local/Programs/tokless/tokless.exe rtk-hook copilot"
+      }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "C:/Users/DELL/AppData/Local/Programs/tokless/tokless.exe copilot-hook codegraph-index --vscode",
+        "timeout": 120
+      }
+    ]
+  }
+}
