@@ -32,6 +32,18 @@
     "typescript": "^5.7.3",
     "vite": "^6.1.0",
     "vitest": "^3.0.5"
-  }
+  },
+  "description": "> **Real execution and step-by-step algorithm visualizer for Python, C++, and Java.**   > CodeLens inspects source code (with or without `main()`, including LeetCode-style `class Solution`), identifies what problem it solves, automatically generates boundary test cases, and plays back an animated, step-by-step execution trace recorded from real execution.",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NithinReddy0007/codelens.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/NithinReddy0007/codelens/issues"
+  },
+  "homepage": "https://github.com/NithinReddy0007/codelens#readme"
 }
-

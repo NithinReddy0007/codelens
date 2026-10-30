@@ -342,7 +342,7 @@ export const App: React.FC = () => {
               </span>
             )}
           </div>
-          <div style={{ flex: 1, overflow: 'hidden' }}>
+          <div className="editor-wrapper">
             <CodeEditor
               code={code}
               onChange={setCode}

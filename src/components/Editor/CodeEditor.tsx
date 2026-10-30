@@ -220,15 +220,15 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       ]
     });
 
-    // Scroll active line into view smoothly
+    // Scroll active line into view smoothly only when executing
     if (activeLine && activeLine > 0 && activeLine <= view.state.doc.lines) {
       const line = view.state.doc.line(activeLine);
       view.dispatch({
-        effects: EditorView.scrollIntoView(line.from, { y: 'center' })
+        effects: EditorView.scrollIntoView(line.from, { y: 'nearest' })
       });
     }
   }, [activeLine, errorLine, executedLines]);
 
-  return <div ref={containerRef} className="editor-container w-full h-full" />;
+  return <div ref={containerRef} className="editor-container" />;
 };
 
