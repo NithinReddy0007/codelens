@@ -3,7 +3,7 @@ import { identifyProblem } from '../utils/problemIdentifier';
 import { generateTestCases, compareOutputs } from '../utils/testCaseGenerator';
 
 describe('Phase 3 - Test Case Generation & Acceptance', () => {
-  it('generates at least 8 test cases for LeetCode Two Sum with reliable expected outputs', () => {
+  it('generates 3-4 curated test cases for LeetCode Two Sum with reliable expected outputs', () => {
     const twoSumPy = `
 class Solution:
     def twoSum(self, nums: list[int], target: int) -> list[int]:
@@ -19,7 +19,8 @@ class Solution:
     expect(analysis.problemId).toBe('two_sum');
 
     const cases = generateTestCases(analysis);
-    expect(cases.length).toBeGreaterThanOrEqual(8);
+    expect(cases.length).toBeGreaterThanOrEqual(3);
+    expect(cases.length).toBeLessThanOrEqual(4);
 
     // Verify first case has expected output
     const case1 = cases[0];
@@ -35,7 +36,7 @@ class Solution:
     expect(case3.expectedOutput).toEqual([0, 1]);
   });
 
-  it('generates 8 structural cases for generic function signature', () => {
+  it('generates 3 curated structural cases for generic function signature', () => {
     const customSig = {
       problemName: 'Custom Algorithm',
       description: 'Custom function',
@@ -57,7 +58,7 @@ class Solution:
     };
 
     const cases = generateTestCases(customSig);
-    expect(cases.length).toBe(8);
+    expect(cases.length).toBe(3);
     expect(cases[0].label).toBe('Typical case');
     expect(cases[1].label).toBe('Minimal / Empty');
     expect(cases[1].args[0]).toEqual([]);

@@ -8,10 +8,11 @@ export function generateTestCases(analysis: ProblemAnalysis): TestCase[] {
     ? PROBLEM_CATALOG.find((p) => p.id === analysis.problemId)
     : null;
 
-  // 1. If we have catalog defaults, use them
+  // 1. If we have catalog defaults, use first 3–4 cases only
   if (catalogEntry?.defaultCases && catalogEntry.defaultCases.length > 0) {
-    for (let i = 0; i < catalogEntry.defaultCases.length; i++) {
-      const defCase = catalogEntry.defaultCases[i];
+    const sliced = catalogEntry.defaultCases.slice(0, 4);
+    for (let i = 0; i < sliced.length; i++) {
+      const defCase = sliced[i];
       let expected: any = undefined;
       let hasExpected = false;
 
@@ -35,26 +36,16 @@ export function generateTestCases(analysis: ProblemAnalysis): TestCase[] {
       });
     }
 
-    // Add extra boundary cases if under 8
-    if (cases.length < 8 && analysis.signature) {
-      addGenericBoundaryCases(cases, analysis.signature, catalogEntry);
-    }
-
     return cases;
   }
 
-  // 2. Generic generator from parsed signature
+  // 2. Generic generator from parsed signature — exactly 3 cases
   if (analysis.signature && analysis.signature.parameters.length > 0) {
     const params = analysis.signature.parameters;
     const labels = [
       'Typical case',
       'Minimal / Empty',
-      'Single element',
-      'Boundary (Negatives)',
-      'Duplicates / All equal',
-      'Already sorted',
-      'Reverse sorted',
-      'Larger bounded case'
+      'Single element'
     ];
 
     for (let i = 0; i < labels.length; i++) {

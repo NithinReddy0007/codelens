@@ -14,10 +14,11 @@ export interface Token {
 }
 
 const KEYWORDS = new Set([
-  'int', 'long', 'double', 'float', 'char', 'bool', 'boolean', 'void',
-  'string', 'String', 'vector', 'ArrayList', 'unordered_map', 'HashMap',
-  'unordered_set', 'HashSet', 'set', 'stack', 'Stack', 'queue', 'Queue',
-  'pair', 'class', 'struct', 'public', 'private', 'protected', 'static',
+  'int', 'long', 'double', 'float', 'char', 'byte', 'short', 'bool', 'boolean', 'void',
+  'string', 'String', 'vector', 'ArrayList', 'List', 'Map', 'Set', 'unordered_map', 'HashMap',
+  'unordered_set', 'HashSet', 'set', 'stack', 'Stack', 'queue', 'Queue', 'Deque', 'ArrayDeque',
+  'LinkedList', 'Integer', 'Character', 'Double', 'Boolean', 'Long', 'Object',
+  'pair', 'class', 'struct', 'public', 'private', 'protected', 'static', 'final',
   'return', 'if', 'else', 'while', 'for', 'do', 'switch', 'case', 'break',
   'continue', 'new', 'true', 'false', 'null', 'nullptr', 'this', 'auto',
   'std', 'Math', 'System', 'out', 'println', 'print', 'cout', 'cin', 'endl'

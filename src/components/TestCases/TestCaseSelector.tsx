@@ -131,6 +131,11 @@ export const TestCaseSelector: React.FC<TestCaseSelectorProps> = ({
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, overflowX: 'auto' }}>
         {testCases.map((tc, idx) => {
           const isSelected = tc.id === selectedCaseId;
+          const inputPreview = tc.args && tc.args.length > 0
+            ? tc.args.map(a => JSON.stringify(a)).join(', ')
+            : '[]';
+          const expectedPreview = tc.hasExpected ? JSON.stringify(tc.expectedOutput) : null;
+
           return (
             <button
               key={tc.id}
@@ -139,14 +144,34 @@ export const TestCaseSelector: React.FC<TestCaseSelectorProps> = ({
                 background: isSelected ? 'var(--bg-elevated)' : 'var(--bg-tertiary)',
                 borderColor: isSelected ? 'var(--accent)' : 'var(--border-subtle)',
                 color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
-                padding: '3px 8px',
+                padding: '4px 10px',
                 fontSize: '11px',
                 whiteSpace: 'nowrap',
-                flexShrink: 0
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                gap: '2px'
               }}
             >
-              <span>{tc.label || `Case ${idx + 1}`}</span>
-              {renderStatusBadge(tc.status)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }}>
+                <span style={{ fontWeight: 600 }}>{tc.label || `Case ${idx + 1}`}</span>
+                {renderStatusBadge(tc.status)}
+              </div>
+              <div
+                style={{
+                  fontSize: '10px',
+                  fontFamily: 'var(--font-mono)',
+                  color: isSelected ? 'var(--text-secondary)' : 'var(--text-muted)',
+                  display: 'flex',
+                  gap: '6px'
+                }}
+              >
+                <span>in: {inputPreview.length > 20 ? inputPreview.slice(0, 18) + '…' : inputPreview}</span>
+                {expectedPreview !== null && (
+                  <span>exp: {expectedPreview.length > 15 ? expectedPreview.slice(0, 13) + '…' : expectedPreview}</span>
+                )}
+              </div>
             </button>
           );
         })}

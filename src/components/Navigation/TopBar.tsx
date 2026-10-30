@@ -5,7 +5,6 @@ import {
   Settings,
   Sun,
   Moon,
-  Sparkles,
   Loader2,
   Code2
 } from 'lucide-react';
@@ -13,8 +12,7 @@ import { SupportedLanguage } from '../../types/trace';
 
 interface TopBarProps {
   language: SupportedLanguage;
-  autoDetect: boolean;
-  onLanguageChange: (lang: SupportedLanguage, auto: boolean) => void;
+  onLanguageChange: (lang: SupportedLanguage) => void;
   onRun: () => void;
   isRunning: boolean;
   pyodideStatus: { state: string; message?: string };
@@ -29,7 +27,6 @@ interface TopBarProps {
 
 export const TopBar: React.FC<TopBarProps> = ({
   language,
-  autoDetect,
   onLanguageChange,
   onRun,
   isRunning,
@@ -78,17 +75,10 @@ export const TopBar: React.FC<TopBarProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Language:</label>
           <select
-            value={autoDetect ? 'auto' : language}
-            onChange={(e) => {
-              if (e.target.value === 'auto') {
-                onLanguageChange('python', true);
-              } else {
-                onLanguageChange(e.target.value as SupportedLanguage, false);
-              }
-            }}
+            value={language}
+            onChange={(e) => onLanguageChange(e.target.value as SupportedLanguage)}
             style={{ fontSize: '12px' }}
           >
-            <option value="auto">Auto-Detect {autoDetect ? `(${language})` : ''}</option>
             <option value="python">Python</option>
             <option value="java">Java (in-browser)</option>
             <option value="cpp">C++ (in-browser)</option>
@@ -172,4 +162,3 @@ export const TopBar: React.FC<TopBarProps> = ({
     </header>
   );
 };
-

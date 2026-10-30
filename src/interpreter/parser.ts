@@ -322,7 +322,7 @@ export class Parser {
     const startLine = this.peek().line;
 
     // Skip qualifiers
-    while (this.match('public', 'private', 'protected', 'static', 'inline', 'const')) {}
+    while (this.match('public', 'private', 'protected', 'static', 'inline', 'const', 'final')) {}
 
     // Parse type name (e.g. int, void, vector<int>, int[], TreeNode*)
     const typeStr = this.parseTypeString();
@@ -810,13 +810,19 @@ export class Parser {
     if (this.match('new')) {
       const className = this.parseTypeString();
       if (this.match('[')) {
-        // new int[5]
-        const sizeExpr = this.expression();
+        // new int[5] or new int[] { 1, 2 }
+        let sizeExpr: ASTNode | undefined;
+        if (!this.check(']')) {
+          sizeExpr = this.expression();
+        }
         this.consume(']', "Expect ']' after array size");
+        if (this.check('{')) {
+          return this.arrayLiteral();
+        }
         return {
           type: 'NewExpr',
           className: className + '[]',
-          args: [sizeExpr],
+          args: sizeExpr ? [sizeExpr] : [],
           line
         };
       }
@@ -913,10 +919,11 @@ export class Parser {
       return true;
     }
     return [
-      'int', 'long', 'double', 'float', 'char', 'bool', 'boolean', 'void',
-      'string', 'String', 'vector', 'ArrayList', 'unordered_map', 'HashMap',
-      'set', 'HashSet', 'stack', 'Stack', 'queue', 'Queue', 'pair', 'auto',
-      'ListNode', 'TreeNode', 'Solution'
+      'int', 'long', 'double', 'float', 'char', 'byte', 'short', 'bool', 'boolean', 'void',
+      'string', 'String', 'vector', 'ArrayList', 'List', 'Map', 'Set', 'unordered_map', 'HashMap',
+      'unordered_set', 'HashSet', 'set', 'stack', 'Stack', 'queue', 'Queue', 'Deque', 'ArrayDeque',
+      'LinkedList', 'Integer', 'Character', 'Double', 'Boolean', 'Long', 'Object',
+      'pair', 'auto', 'ListNode', 'TreeNode', 'Solution'
     ].includes(val);
   }
 
