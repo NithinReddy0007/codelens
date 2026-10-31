@@ -809,6 +809,12 @@ export class Parser {
 
     if (this.match('new')) {
       const className = this.parseTypeString();
+      if (className.includes('[]')) {
+        // className already swallowed the brackets, e.g. int[]
+        if (this.check('{')) {
+          return this.arrayLiteral();
+        }
+      }
       if (this.match('[')) {
         // new int[5] or new int[] { 1, 2 }
         let sizeExpr: ASTNode | undefined;
@@ -825,6 +831,9 @@ export class Parser {
           args: sizeExpr ? [sizeExpr] : [],
           line
         };
+      }
+      if (this.check('{')) {
+        return this.arrayLiteral();
       }
       this.consume('(', "Expect '(' after class name in new");
       const args: ASTNode[] = [];
@@ -904,6 +913,11 @@ export class Parser {
       }
     }
     while (this.match('[')) {
+      if (!this.check(']')) {
+        // e.g. new int[0] — put the token back so new expression handler can parse the size expression!
+        this.current--;
+        break;
+      }
       this.consume(']', "Expect ']'");
       t += '[]';
     }

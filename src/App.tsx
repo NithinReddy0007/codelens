@@ -34,7 +34,6 @@ export const App: React.FC = () => {
   });
 
   const [language, setLanguage] = useState<SupportedLanguage>('python');
-  const [selectedExample, setSelectedExample] = useState('bubble_sort_py');
 
   // Execution & Trace state
   const [isRunning, setIsRunning] = useState(false);
@@ -70,13 +69,16 @@ export const App: React.FC = () => {
       if (!isCancelled) {
         setAnalysis(res);
         const cases = generateTestCases(res);
-        setTestCases(cases);
-        if (cases.length > 0) {
-          setSelectedCaseId(cases[0].id);
-        }
+        setTestCases((prev) =>
+          cases.map((c) => {
+            const old = prev.find((p) => p.id === c.id && JSON.stringify(p.args) === JSON.stringify(c.args));
+            return old ? { ...c, status: old.status, actualOutput: old.actualOutput, error: old.error } : c;
+          })
+        );
+        setSelectedCaseId((cur) => (cases.some((c) => c.id === cur) ? cur : cases[0]?.id ?? ''));
       }
     };
-    const timer = setTimeout(runAnalysis, 250);
+    const timer = setTimeout(runAnalysis, apiKey.trim() ? 1500 : 250);
     return () => {
       isCancelled = true;
       clearTimeout(timer);
@@ -143,20 +145,18 @@ export const App: React.FC = () => {
       setExecutionResult(result);
       setCurrentStep(0);
 
-      // Update active test case status & comparison
+      // Update active test case status & comparison (immutably)
       if (activeCase) {
+        let patch: Partial<TestCase>;
         if (!result.success) {
-          activeCase.status = 'error';
-          activeCase.error = result.error?.message;
+          patch = { status: 'error', error: result.error?.message };
         } else if (activeCase.hasExpected) {
           const isPassed = compareOutputs(result.returnValue, activeCase.expectedOutput);
-          activeCase.status = isPassed ? 'passed' : 'failed';
-          activeCase.actualOutput = result.returnValue;
+          patch = { status: isPassed ? 'passed' : 'failed', actualOutput: result.returnValue };
         } else {
-          activeCase.status = 'passed';
-          activeCase.actualOutput = result.returnValue;
+          patch = { status: 'passed', actualOutput: result.returnValue };
         }
-        setTestCases([...testCases]);
+        setTestCases((prev) => prev.map((tc) => (tc.id === activeCase.id ? { ...tc, ...patch } : tc)));
       }
     } catch (err: any) {
       setExecutionResult({
@@ -266,19 +266,6 @@ export const App: React.FC = () => {
     alert('Permalink copied to clipboard!');
   };
 
-  // Example selection — sets language explicitly
-  const handleSelectExample = (id: string) => {
-    const found = EXAMPLES.find((ex) => ex.id === id);
-    if (found) {
-      setSelectedExample(id);
-      setCode(found.code);
-      setLanguage(found.language);
-      setExecutionResult(null);
-      setCurrentStep(0);
-      setIsPlaying(false);
-    }
-  };
-
   const currentStepData = executionResult?.trace[currentStep] || null;
   const previousStepData = currentStep > 0 && executionResult ? executionResult.trace[currentStep - 1] : null;
   const activeCase = testCases.find((tc) => tc.id === selectedCaseId);
@@ -309,9 +296,6 @@ export const App: React.FC = () => {
         onOpenSettings={() => setSettingsOpen(true)}
         theme={theme}
         onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-        selectedExample={selectedExample}
-        onSelectExample={handleSelectExample}
-        examples={EXAMPLES}
       />
 
       {/* Main Workspace (Editor + Visualizer) */}

@@ -17,12 +17,23 @@ export type StructureKind =
   | 'linkedlist'
   | 'tree';
 
+export type CellMarkKind = 'cursor' | 'read' | 'hit' | 'place' | 'remove' | 'write' | 'placed' | 'removed';
+
+export interface CellMark {
+  r: number;
+  c: number;
+  kind: CellMarkKind;
+  label: string;
+}
+
 export interface StructureInfo {
   id: string; // name or identifier (e.g. "arr", "nums", "stack")
   kind: StructureKind;
   data: any; // array values, matrix rows, key-value entries, node graph, etc.
   pointers: Record<string, number | string>; // e.g. { i: 2, j: 3, left: 0 }
   highlighted: (number | string)[]; // indices or node keys currently active/compared/written
+  marks?: CellMark[]; // matrix only: labelled cell pointers
+  axis?: { row: Record<string, string>; col: Record<string, string> }; // matrix only: variable names per row/col index
 }
 
 export interface VariableValue {
@@ -32,12 +43,20 @@ export interface VariableValue {
   isPointer?: boolean;
 }
 
+export interface StackFrameInfo {
+  name: string;
+  line: number;
+  params?: Record<string, any>;
+  variables?: Record<string, any>;
+}
+
 export interface TraceStep {
   step: number;
   line: number;
   event: TraceEvent;
   frame: string;
   depth: number;
+  callStack?: StackFrameInfo[];
   vars: Record<string, VariableValue>;
   changed: string[];
   structures: StructureInfo[];

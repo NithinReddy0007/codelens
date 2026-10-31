@@ -17,7 +17,7 @@ export async function identifyProblemWithAI(
   const cleanKey = apiKey.trim();
 
   // 1. Try Gemini API if key starts with AIzaSy
-  if (cleanKey.startsWith('AIzaSy') || cleanKey.length === 39) {
+  if (cleanKey.startsWith('AIzaSy')) {
     try {
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cleanKey}`,

@@ -11,11 +11,13 @@ export function runInterpreter(
 ): ExecutionResult {
   const startTime = performance.now();
 
+  let phase: 'CompilationError' | 'RuntimeError' = 'CompilationError';
   try {
     const tokens = tokenize(code);
     const parser = new Parser(tokens);
     const ast = parser.parse();
 
+    phase = 'RuntimeError';
     const interpreter = new Interpreter(maxSteps);
     const result = interpreter.execute(ast, undefined, args);
 
@@ -34,7 +36,7 @@ export function runInterpreter(
       error: {
         line: err.line || 1,
         message: err.message || String(err),
-        type: 'SyntaxError'
+        type: phase
       },
       stdout: '',
       stats: {

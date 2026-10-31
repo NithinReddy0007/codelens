@@ -354,7 +354,7 @@ class TreeNode:
                         val = v_info['value']
                         if 0 <= val < arr_len:
                             s['pointers'][vk] = val
-                            if vk in changed and val not in s['highlighted']:
+                            if val not in s['highlighted']:
                                 s['highlighted'].append(val)
 
         loop_info = None
@@ -369,12 +369,29 @@ class TreeNode:
 
         delta_stdout = capture.get_delta()
 
+        call_stack_frames = []
+        curr_f = frame
+        while curr_f:
+            if curr_f.f_code.co_filename == '<user_code>':
+                f_name = curr_f.f_code.co_name
+                f_line = max(1, curr_f.f_lineno - helpers_line_count)
+                f_vars = {k: serialize_val(v)[1] for k, v in curr_f.f_locals.items()
+                          if not k.startswith('__') and k not in ('ListNode', 'TreeNode', 'self', '__solution__', '__result__')}
+                call_stack_frames.append({
+                    'name': f_name,
+                    'line': f_line,
+                    'variables': f_vars
+                })
+            curr_f = curr_f.f_back
+        call_stack_frames.reverse()
+
         step_data = {
             'step': len(trace),
             'line': user_line,
             'event': event,
             'frame': frame.f_code.co_name,
-            'depth': 0,
+            'depth': max(0, len(call_stack_frames) - 1),
+            'callStack': call_stack_frames,
             'vars': curr_vars,
             'changed': changed,
             'structures': structures,
@@ -427,8 +444,8 @@ class TreeNode:
         'stdout': capture.get_all(),
         'returnValue': return_value
     })
-`;let r=null,n=!1,l=null;async function o(){if(r)return r;if(n){for(;n;)await new Promise(e=>setTimeout(e,100));if(r)return r;throw new Error(l||"Pyodide failed to load")}n=!0,self.postMessage({type:"status",status:"loading",message:"Downloading & initializing Pyodide runtime..."});try{const{loadPyodide:e}=await import("https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.mjs"),s=await e({stdout:a=>{},stderr:a=>console.error("[Pyodide stderr]",a)});return await s.runPythonAsync(f),r=s,n=!1,self.postMessage({type:"status",status:"ready",message:"Pyodide ready"}),r}catch(e){throw n=!1,l=(e==null?void 0:e.message)||String(e),self.postMessage({type:"status",status:"error",message:`Pyodide init error: ${l}`}),e}}self.onmessage=async e=>{const{id:s,type:a,code:_,harnessInput:i,maxSteps:d}=e.data;if(a==="init"){try{await o()}catch(t){self.postMessage({id:s,type:"status",status:"error",message:t.message})}return}if(a==="run")try{const t=await o();t.globals.set("__user_code_input__",_),t.globals.set("__user_harness_input__",i?JSON.stringify(i):null),t.globals.set("__user_max_steps__",d||2e4);const u=await t.runPythonAsync(`
+`;let r=null,n=!1,l=null;async function o(){if(r)return r;if(n){for(;n;)await new Promise(e=>setTimeout(e,100));if(r)return r;throw new Error(l||"Pyodide failed to load")}n=!0,self.postMessage({type:"status",status:"loading",message:"Downloading & initializing Pyodide runtime..."});try{const{loadPyodide:e}=await import("https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.mjs"),s=await e({stdout:a=>{},stderr:a=>console.error("[Pyodide stderr]",a)});return await s.runPythonAsync(f),r=s,n=!1,self.postMessage({type:"status",status:"ready",message:"Pyodide ready"}),r}catch(e){throw n=!1,l=(e==null?void 0:e.message)||String(e),self.postMessage({type:"status",status:"error",message:`Pyodide init error: ${l}`}),e}}self.onmessage=async e=>{const{id:s,type:a,code:_,harnessInput:i,maxSteps:d}=e.data;if(a==="init"){try{await o()}catch(t){self.postMessage({id:s,type:"status",status:"error",message:t.message})}return}if(a==="run")try{const t=await o();t.globals.set("__user_code_input__",_),t.globals.set("__user_harness_input__",i?JSON.stringify(i):null),t.globals.set("__user_max_steps__",d||2e4);const c=await t.runPythonAsync(`
 import json
 h_in = json.loads(__user_harness_input__) if __user_harness_input__ else None
 run_python_tracer(__user_code_input__, h_in, __user_max_steps__)
-`),c=JSON.parse(u);self.postMessage({id:s,type:"result",result:c})}catch(t){self.postMessage({id:s,type:"result",result:{success:!1,trace:[],totalSteps:0,truncated:!1,error:{line:1,message:t.message||String(t),type:"WorkerRuntimeError"},stdout:""}})}};
+`),u=JSON.parse(c);self.postMessage({id:s,type:"result",result:u})}catch(t){self.postMessage({id:s,type:"result",result:{success:!1,trace:[],totalSteps:0,truncated:!1,error:{line:1,message:t.message||String(t),type:"WorkerRuntimeError"},stdout:""}})}};

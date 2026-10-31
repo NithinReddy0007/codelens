@@ -370,10 +370,9 @@ class TreeNode:
                         if 0 <= val < arr_len:
                             # Attach as pointer
                             s['pointers'][vk] = val
-                            # If this variable or array changed this step, highlight the index
-                            if vk in changed or s['id'] in changed:
-                                if val not in s['highlighted']:
-                                    s['highlighted'].append(val)
+                            # Always highlight the cell pointed to by an active index/pointer!
+                            if val not in s['highlighted']:
+                                s['highlighted'].append(val)
 
         # Loop iteration tracking
         loop_info = None
@@ -391,12 +390,30 @@ class TreeNode:
         # Stdout delta
         delta_stdout = capture.get_delta()
 
+        # Build full call stack inspection
+        call_stack_frames = []
+        curr_f = frame
+        while curr_f:
+            if curr_f.f_code.co_filename == '<user_code>':
+                f_name = curr_f.f_code.co_name
+                f_line = max(1, curr_f.f_lineno - helpers_line_count)
+                f_vars = {k: serialize_val(v)[1] for k, v in curr_f.f_locals.items()
+                          if not k.startswith('__') and k not in ('ListNode', 'TreeNode', 'self', '__solution__', '__result__')}
+                call_stack_frames.append({
+                    'name': f_name,
+                    'line': f_line,
+                    'variables': f_vars
+                })
+            curr_f = curr_f.f_back
+        call_stack_frames.reverse() # bottom of stack first
+
         step_data = {
             'step': len(trace),
             'line': user_line,
             'event': event,
             'frame': frame.f_code.co_name,
-            'depth': 0, # computed relative to base
+            'depth': max(0, len(call_stack_frames) - 1),
+            'callStack': call_stack_frames,
             'vars': curr_vars,
             'changed': changed,
             'structures': structures,

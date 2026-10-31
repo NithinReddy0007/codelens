@@ -20,9 +20,6 @@ interface TopBarProps {
   onOpenSettings: () => void;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
-  selectedExample: string;
-  onSelectExample: (id: string) => void;
-  examples: Array<{ id: string; title: string; language: SupportedLanguage }>;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -34,10 +31,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onShare,
   onOpenSettings,
   theme,
-  onToggleTheme,
-  selectedExample,
-  onSelectExample,
-  examples
+  onToggleTheme
 }) => {
   return (
     <header className="top-bar">
@@ -70,7 +64,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         </span>
       </div>
 
-      {/* Language & Examples Selector */}
+      {/* Language Selector */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Language:</label>
@@ -82,22 +76,6 @@ export const TopBar: React.FC<TopBarProps> = ({
             <option value="python">Python</option>
             <option value="java">Java (in-browser)</option>
             <option value="cpp">C++ (in-browser)</option>
-          </select>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Examples:</label>
-          <select
-            value={selectedExample}
-            onChange={(e) => onSelectExample(e.target.value)}
-            style={{ fontSize: '12px', maxWidth: '170px' }}
-          >
-            <option value="">Load an example...</option>
-            {examples.map((ex) => (
-              <option key={ex.id} value={ex.id}>
-                {ex.title} [{ex.language.toUpperCase()}]
-              </option>
-            ))}
           </select>
         </div>
       </div>

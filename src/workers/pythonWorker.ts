@@ -13,11 +13,129 @@ MAX_STEPS_DEFAULT = 20000
 class StopExecution(Exception):
     pass
 
+_NOVAL = object()
+ALLOWED_FUNCS = ('abs', 'min', 'max', 'len')
+SAFE_NODES = (ast.Expression, ast.Name, ast.Constant, ast.BinOp, ast.UnaryOp, ast.BoolOp, ast.Compare, ast.Subscript, ast.Tuple, ast.Load, ast.operator, ast.unaryop, ast.boolop, ast.cmpop, ast.Call)
+
+def safe_compile(node):
+    try:
+        for n in ast.walk(node):
+            if not isinstance(n, SAFE_NODES):
+                return None
+            if isinstance(n, ast.Call) and not (isinstance(n.func, ast.Name) and n.func.id in ALLOWED_FUNCS and not n.keywords):
+                return None
+        expr = ast.Expression(body=node)
+        ast.fix_missing_locations(expr)
+        return compile(expr, '<expr>', 'eval')
+    except Exception:
+        return None
+
+def safe_eval(code, frame):
+    if code is None:
+        return _NOVAL
+    try:
+        ns = dict(frame.f_globals)
+        ns.update(frame.f_locals)
+        ns['__builtins__'] = {'abs': abs, 'min': min, 'max': max, 'len': len}
+        return eval(code, ns)
+    except Exception:
+        return _NOVAL
+
+def matrix_ref(node):
+    # matches name[row][col]
+    if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Subscript) and isinstance(node.value.value, ast.Name):
+        rn = node.value.slice
+        cn = node.slice
+        rc = safe_compile(rn)
+        cc = safe_compile(cn)
+        if rc is None or cc is None:
+            return None
+        try:
+            return (node.value.value.id, rc, cc, ast.unparse(rn), ast.unparse(cn))
+        except Exception:
+            return None
+    return None
+
+def is_idx(v):
+    return isinstance(v, int) and not isinstance(v, bool)
+
+def compute_marks(var, grid, frame, user_line, analyzer, prev_grid, last_read, curr_vars):
+    marks = []
+    axis = {'row': {}, 'col': {}}
+    nrows = len(grid)
+    ncols = len(grid[0]) if nrows and isinstance(grid[0], list) else 0
+
+    def in_b(r, c):
+        return is_idx(r) and is_idx(c) and 0 <= r < nrows and 0 <= c < ncols
+
+    def ax(kind, idx, name):
+        if name and name.isidentifier():
+            key = str(idx)
+            old = axis[kind].get(key)
+            if old is None:
+                axis[kind][key] = name
+            elif name not in old.split(','):
+                axis[kind][key] = old + ',' + name
+
+    found_read = False
+    for (v, rcode, ccode, rsrc, csrc, mode, vcode) in analyzer.subs.get(user_line, []):
+        if v != var:
+            continue
+        r = safe_eval(rcode, frame)
+        c = safe_eval(ccode, frame)
+        if not in_b(r, c):
+            continue
+        label = var + '[' + rsrc + '][' + csrc + ']'
+        if mode == 'read':
+            found_read = True
+            last_read[(id(frame), var)] = (r, c, label)
+            marks.append({'r': r, 'c': c, 'kind': 'read', 'label': label})
+        else:
+            newv = safe_eval(vcode, frame)
+            cur = grid[r][c]
+            kind = 'write'
+            if newv is not _NOVAL:
+                if newv and not cur:
+                    kind = 'place'
+                elif (not newv) and cur:
+                    kind = 'remove'
+            marks.append({'r': r, 'c': c, 'kind': kind, 'label': label})
+        ax('row', r, rsrc)
+        ax('col', c, csrc)
+
+    for rn, cn in (('row', 'col'), ('r', 'c'), ('x', 'y')):
+        rv = curr_vars.get(rn)
+        cv = curr_vars.get(cn)
+        if rv and cv and rv['type'] == 'int' and cv['type'] == 'int' and in_b(rv['value'], cv['value']):
+            marks.append({'r': rv['value'], 'c': cv['value'], 'kind': 'cursor', 'label': rn + ',' + cn})
+            ax('row', rv['value'], rn)
+            ax('col', cv['value'], cn)
+            break
+
+    tcode = analyzer.if_codes.get(user_line)
+    if tcode is not None and not found_read:
+        lr = last_read.get((id(frame), var))
+        res = safe_eval(tcode, frame)
+        if lr and res is not _NOVAL and res:
+            marks.append({'r': lr[0], 'c': lr[1], 'kind': 'hit', 'label': lr[2]})
+
+    if prev_grid and isinstance(prev_grid, list) and len(prev_grid) == nrows:
+        for r in range(nrows):
+            pr = prev_grid[r]
+            if isinstance(pr, list) and len(pr) == ncols and isinstance(grid[r], list):
+                for c in range(ncols):
+                    if pr[c] != grid[r][c]:
+                        marks.append({'r': r, 'c': c, 'kind': 'placed' if grid[r][c] else 'removed', 'label': str(pr[c]) + ' -> ' + str(grid[r][c])})
+    return marks, axis
+
 class CodeAnalyzer(ast.NodeVisitor):
     def __init__(self, source_code: str):
         self.source = source_code
         self.lines = source_code.splitlines()
         self.if_nodes = {}
+        self.subs = {}
+        self.if_codes = {}
+        self.if_bodies = {}
         self.while_nodes = {}
         self.for_nodes = {}
         self.function_defs = []
@@ -44,6 +162,20 @@ class CodeAnalyzer(ast.NodeVisitor):
                     self.has_top_level_exec = True
 
             for node in ast.walk(tree):
+                if isinstance(node, (ast.Assign, ast.AugAssign, ast.AnnAssign)) and getattr(node, 'value', None) is not None:
+                    targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                    vcode = safe_compile(node.value) if isinstance(node, ast.Assign) else None
+                    for t in targets:
+                        ref = matrix_ref(t)
+                        if ref:
+                            self.subs.setdefault(node.lineno, []).append(ref + ('write', vcode))
+                elif isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Load):
+                    ref = matrix_ref(node)
+                    if ref:
+                        self.subs.setdefault(node.lineno, []).append(ref + ('read', None))
+                if isinstance(node, ast.If):
+                    self.if_codes[node.lineno] = safe_compile(node.test)
+            for node in ast.walk(tree):
                 lineno = getattr(node, 'lineno', None)
                 if lineno is None:
                     continue
@@ -53,6 +185,7 @@ class CodeAnalyzer(ast.NodeVisitor):
                     except Exception:
                         cond = self.lines[lineno - 1].strip() if lineno <= len(self.lines) else 'condition'
                     self.if_nodes[lineno] = cond
+                    self.if_bodies[lineno] = node.body[0].lineno if node.body else None
                 elif isinstance(node, ast.While):
                     try:
                         cond = ast.unparse(node.test)
@@ -225,12 +358,14 @@ class TreeNode:
             harness_append = f"\\n__result__ = {fn_name}({arg_str})\\n"
 
     total_code = helpers + "\\n" + code_to_exec + harness_append
-    helpers_line_count = len(helpers.strip().splitlines()) + 1
+    helpers_line_count = (helpers + "\\n").count("\\n")
 
     trace = []
     prev_vars = {}
     prev_structures = {}
     prev_line = -1
+    pending_branch = None
+    last_read = {}
     loop_iterations = {}
     step_count = 0
     truncated = False
@@ -261,7 +396,7 @@ class TreeNode:
     sys.stdout = capture
 
     def tracer(frame, event, arg):
-        nonlocal step_count, truncated, prev_vars, prev_structures, prev_line, return_value
+        nonlocal pending_branch, step_count, truncated, prev_vars, prev_structures, prev_line, return_value
         if frame.f_code.co_filename != '<user_code>':
             return tracer
 
@@ -269,6 +404,11 @@ class TreeNode:
         user_line = raw_line - helpers_line_count
         if user_line < 1 or user_line > len(analyzer.lines):
             return tracer
+
+        if pending_branch is not None and pending_branch[0] is frame:
+            _f, _idx, _body = pending_branch
+            trace[_idx]['branch']['result'] = (event == 'line' and user_line == _body)
+            pending_branch = None
 
         step_count += 1
         if step_count > max_steps:
@@ -357,27 +497,54 @@ class TreeNode:
                         val = v_info['value']
                         if 0 <= val < arr_len:
                             s['pointers'][vk] = val
-                            if vk in changed and val not in s['highlighted']:
+                            if val not in s['highlighted']:
                                 s['highlighted'].append(val)
+
+        if event == 'call':
+            for _k in [k for k in last_read if k[0] == id(frame)]:
+                del last_read[_k]
+        for s in structures:
+            if s['kind'] == 'matrix' and s['data'] and isinstance(s['data'][0], list):
+                s['marks'], s['axis'] = compute_marks(s['id'], s['data'], frame, user_line, analyzer, prev_structures.get(s['id']), last_read, curr_vars)
 
         loop_info = None
         if user_line in analyzer.while_nodes or user_line in analyzer.for_nodes:
-            loop_iterations[user_line] = loop_iterations.get(user_line, 0) + 1
-            loop_info = {'line': user_line, 'iteration': loop_iterations[user_line]}
+            lk = (id(frame), user_line)
+            loop_iterations[lk] = loop_iterations.get(lk, 0) + 1
+            loop_info = {'line': user_line, 'iteration': loop_iterations[lk]}
 
         branch_info = None
         if user_line in analyzer.if_nodes:
             cond_str = analyzer.if_nodes[user_line]
             branch_info = {'line': user_line, 'condition': cond_str, 'result': True}
+            if event == 'line':
+                pending_branch = (frame, len(trace), analyzer.if_bodies.get(user_line))
 
         delta_stdout = capture.get_delta()
+
+        call_stack_frames = []
+        curr_f = frame
+        while curr_f:
+            if curr_f.f_code.co_filename == '<user_code>':
+                f_name = curr_f.f_code.co_name
+                f_line = max(1, curr_f.f_lineno - helpers_line_count)
+                f_vars = {k: serialize_val(v)[1] for k, v in curr_f.f_locals.items()
+                          if not k.startswith('__') and k not in ('ListNode', 'TreeNode', 'self', '__solution__', '__result__')}
+                call_stack_frames.append({
+                    'name': f_name,
+                    'line': f_line,
+                    'variables': f_vars
+                })
+            curr_f = curr_f.f_back
+        call_stack_frames.reverse()
 
         step_data = {
             'step': len(trace),
             'line': user_line,
             'event': event,
             'frame': frame.f_code.co_name,
-            'depth': 0,
+            'depth': max(0, len(call_stack_frames) - 1),
+            'callStack': call_stack_frames,
             'vars': curr_vars,
             'changed': changed,
             'structures': structures,
@@ -385,9 +552,6 @@ class TreeNode:
             'loop': loop_info,
             'stdout': delta_stdout if delta_stdout else None
         }
-
-        if event == 'return':
-            return_value = serialize_val(arg)[1]
 
         trace.append(step_data)
         prev_vars = {k: v['value'] for k, v in curr_vars.items()}

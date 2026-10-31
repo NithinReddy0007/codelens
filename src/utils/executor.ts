@@ -7,7 +7,9 @@ class ExecutionManager {
   private statusListeners: Set<StatusListener> = new Set();
   private isPyodideReady = false;
   private currentRunReject: ((reason?: any) => void) | null = null;
-  private workerTimeoutId: any = null;
+  private readyPromise: Promise<boolean> = Promise.resolve(false);
+  private resolveReady: (ok: boolean) => void = () => {};
+  private runCounter = 0;
 
   constructor() {
     this.initPythonWorker();
@@ -30,6 +32,7 @@ class ExecutionManager {
   }
 
   private initPythonWorker() {
+    this.readyPromise = new Promise<boolean>((res) => { this.resolveReady = res; });
     if (this.pythonWorker) {
       try {
         this.pythonWorker.terminate();
@@ -47,10 +50,12 @@ class ExecutionManager {
         if (type === 'status') {
           if (status === 'ready') {
             this.isPyodideReady = true;
+            this.resolveReady(true);
             this.notifyStatus('ready', message);
           } else if (status === 'loading') {
             this.notifyStatus('loading', message);
           } else if (status === 'error') {
+            this.resolveReady(false);
             this.notifyStatus('error', message);
           }
         }
@@ -58,6 +63,7 @@ class ExecutionManager {
 
       this.pythonWorker.onerror = (err) => {
         console.error('Worker error:', err);
+        this.resolveReady(false);
         this.notifyStatus('error', err.message || 'Worker error');
       };
 
@@ -92,85 +98,62 @@ class ExecutionManager {
     timeoutMs: number = 10000
   ): Promise<ExecutionResult> {
     const startTime = performance.now();
+    const fail = (message: string, type: string, truncated = false): ExecutionResult => ({
+      success: false,
+      trace: [],
+      totalSteps: 0,
+      truncated,
+      error: { line: 1, message, type },
+      stdout: '',
+      stats: { durationMs: Math.round(performance.now() - startTime), stepsRecorded: 0 }
+    });
+
+    if (!this.pythonWorker) this.initPythonWorker();
+    // Wait for Pyodide to finish loading BEFORE the watchdog starts
+    this.notifyStatus('loading', 'Waiting for Python runtime...');
+    const ready = await this.readyPromise;
+    if (!ready || !this.pythonWorker) {
+      return fail('Python runtime failed to load', 'WorkerInitError');
+    }
+
     this.notifyStatus('running', 'Executing trace...');
+    const worker = this.pythonWorker;
+    const runId = `run-${++this.runCounter}`;
+    const execStart = performance.now();
 
-    return new Promise((resolve) => {
-      if (!this.pythonWorker) {
-        this.initPythonWorker();
-      }
-
-      const runId = Math.random().toString(36).substring(2, 9);
-
-      // Watchdog timeout to prevent frozen workers
-      this.workerTimeoutId = setTimeout(() => {
-        this.terminateAndRestartWorker();
-        this.notifyStatus('ready', 'Worker restarted after timeout');
-        resolve({
-          success: false,
-          trace: [],
-          totalSteps: 0,
-          truncated: true,
-          error: {
-            line: 1,
-            message: 'Execution stopped: time limit reached (possible infinite loop)',
-            type: 'TimeoutError'
-          },
-          stdout: '',
-          stats: {
-            durationMs: Math.round(performance.now() - startTime),
-            stepsRecorded: 0
-          }
-        });
-      }, timeoutMs);
+    return new Promise<ExecutionResult>((resolve) => {
+      let timer: ReturnType<typeof setTimeout>;
+      const cleanup = () => {
+        clearTimeout(timer);
+        worker.removeEventListener('message', handleMessage);
+      };
 
       const handleMessage = (e: MessageEvent) => {
         const data = e.data;
-        if (data.type === 'result' && (!data.id || data.id === runId)) {
-          clearTimeout(this.workerTimeoutId);
-          if (this.pythonWorker) {
-            this.pythonWorker.removeEventListener('message', handleMessage);
-          }
-
-          const result: ExecutionResult = data.result;
-          result.stats = {
-            durationMs: Math.round(performance.now() - startTime),
-            stepsRecorded: result.totalSteps
-          };
-
-          this.notifyStatus('ready', result.success ? `Recorded ${result.totalSteps} steps` : 'Execution finished with error');
-          resolve(result);
-        }
+        if (data.type !== 'result' || data.id !== runId) return;
+        cleanup();
+        const result: ExecutionResult = data.result;
+        result.stats = {
+          durationMs: Math.round(performance.now() - execStart),
+          stepsRecorded: result.totalSteps
+        };
+        this.notifyStatus('ready', result.success ? `Recorded ${result.totalSteps} steps` : 'Execution finished with error');
+        resolve(result);
       };
 
-      if (this.pythonWorker) {
-        this.pythonWorker.addEventListener('message', handleMessage);
-        this.pythonWorker.postMessage({
-          id: runId,
-          type: 'run',
-          code,
-          harnessInput,
-          maxSteps
-        });
-      } else {
-        clearTimeout(this.workerTimeoutId);
-        resolve({
-          success: false,
-          trace: [],
-          totalSteps: 0,
-          truncated: false,
-          error: {
-            line: 1,
-            message: 'Worker could not be initialized',
-            type: 'WorkerInitError'
-          },
-          stdout: ''
-        });
-      }
+      timer = setTimeout(() => {
+        cleanup();
+        if (this.pythonWorker === worker) this.terminateAndRestartWorker();
+        this.notifyStatus('loading', 'Restarting Python runtime after timeout...');
+        resolve(fail('Execution stopped: time limit reached (possible infinite loop)', 'TimeoutError', true));
+      }, timeoutMs);
+
+      worker.addEventListener('message', handleMessage);
+      worker.postMessage({ id: runId, type: 'run', code, harnessInput, maxSteps });
     });
   }
 
   public terminateAndRestartWorker() {
-    clearTimeout(this.workerTimeoutId);
     if (this.pythonWorker) {
       try {
         this.pythonWorker.terminate();

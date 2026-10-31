@@ -102,7 +102,7 @@ export class Interpreter {
   private prevVars: Record<string, any> = {};
   private prevStructures: Record<string, any> = {};
   private loopCounters: Record<number, number> = {};
-  private callStack: string[] = ['<main>'];
+  private callStack: Array<{ name: string; line: number; params?: Record<string, any>; env: Environment }> = [];
 
   constructor(maxSteps = 20000) {
     this.maxSteps = maxSteps;
@@ -120,10 +120,10 @@ export class Interpreter {
     this.prevVars = {};
     this.prevStructures = {};
     this.loopCounters = {};
-    this.callStack = ['<main>'];
 
     const globalEnv = new Environment();
     this.setupGlobals(globalEnv);
+    this.callStack = [{ name: '<main>', line: 1, env: globalEnv }];
 
     // Register all classes and functions
     const functions = new Map<string, FunctionDecl>();
@@ -167,15 +167,18 @@ export class Interpreter {
       let returnValue: any = undefined;
 
       if (targetFn) {
-        this.callStack = [targetFn.name];
         const fnEnv = new Environment(globalEnv);
+        const initialParams: Record<string, any> = {};
 
         // Bind parameters
         for (let i = 0; i < targetFn.params.length; i++) {
           const param = targetFn.params[i];
           const val = args[i] !== undefined ? this.clone(args[i]) : this.getDefaultValueForType(param.type);
           fnEnv.define(param.name, val, param.type);
+          initialParams[param.name] = val;
         }
+
+        this.callStack = [{ name: targetFn.name, line: targetFn.line, params: initialParams, env: fnEnv }];
 
         this.recordStep(targetFn.line, 'call', fnEnv);
 
@@ -694,8 +697,8 @@ export class Interpreter {
 
       if (functions.has(fnName)) {
         const fnDecl = functions.get(fnName)!;
-        this.callStack.push(fnName);
         const fnEnv = new Environment(env);
+        const callParams: Record<string, any> = {};
 
         for (let i = 0; i < fnDecl.params.length; i++) {
           const param = fnDecl.params[i];
@@ -707,8 +710,10 @@ export class Interpreter {
             val = evalArgs[i] !== undefined ? this.clone(evalArgs[i]) : this.getDefaultValueForType(param.type);
           }
           fnEnv.define(param.name, val, param.type);
+          callParams[param.name] = val;
         }
 
+        this.callStack.push({ name: fnName, line: node.line, params: callParams, env: fnEnv });
         this.recordStep(node.line, 'call', fnEnv);
 
         try {
@@ -830,7 +835,8 @@ export class Interpreter {
             const idx = vData.value;
             if (typeof idx === 'number' && idx >= 0 && idx < arrLen) {
               s.pointers[vName] = idx;
-              if (changed.includes(vName) && !s.highlighted.includes(idx)) {
+              // Always highlight the cell pointed to by an active index/pointer!
+              if (!s.highlighted.includes(idx)) {
                 s.highlighted.push(idx);
               }
             }
@@ -839,12 +845,35 @@ export class Interpreter {
       }
     }
 
+    // Update top frame line
+    if (this.callStack.length > 0) {
+      this.callStack[this.callStack.length - 1].line = line;
+    }
+
+    const currentFrame = this.callStack[this.callStack.length - 1];
+    const callStackSnapshot = this.callStack.map((f) => {
+      const fVars: Record<string, any> = {};
+      const visible = f.env.getAllVisible();
+      for (const [k, v] of Object.entries(visible)) {
+        if (!['cout', 'cin', 'endl', 'null', 'nullptr'].includes(k)) {
+          fVars[k] = this.clone(v.value);
+        }
+      }
+      return {
+        name: f.name,
+        line: f.line,
+        params: f.params,
+        variables: fVars
+      };
+    });
+
     this.trace.push({
       step: this.trace.length,
       line,
       event,
-      frame: this.callStack[this.callStack.length - 1] || '<main>',
-      depth: this.callStack.length - 1,
+      frame: currentFrame ? currentFrame.name : '<main>',
+      depth: Math.max(0, this.callStack.length - 1),
+      callStack: callStackSnapshot,
       vars: currVars,
       changed,
       structures,
