@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "C:/Users/DELL/AppData/Local/Programs/tokless/tokless.exe projectmem-hook flat",
+        "timeout": 10
+      }
+    ]
+  }
+}

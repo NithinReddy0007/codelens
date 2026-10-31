@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__context-mode__ctx_search",
+      "mcp__context-mode__ctx_execute",
+      "mcp__context-mode__ctx_execute_file",
+      "mcp__context-mode__ctx_batch_execute",
+      "mcp__context-mode__ctx_index",
+      "mcp__context-mode__ctx_fetch_and_index",
+      "mcp__projectmem__log_issue",
+      "mcp__projectmem__record_attempt",
+      "mcp__projectmem__record_fix",
+      "mcp__projectmem__add_decision",
+      "mcp__projectmem__add_note"
+    ]
+  }
+}
